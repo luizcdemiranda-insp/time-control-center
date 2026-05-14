@@ -70,18 +70,31 @@ def get_data(worksheet_name):
 
 def registrar_log(email, nome, projeto, atividade, acao):
     try:
-        df_existente = get_data("time_logs") # Usa a função blindada
+        url_planilha = "https://docs.google.com/spreadsheets/d/1mdsfbMh6rPUArPycuWqxm7vruUx5JRptP3Z0ufXelA0/edit"
+        
+        # 1. Busca os dados existentes usando a URL
+        df_existente = get_data("time_logs")
+        
+        # 2. Cria o novo registro
         novo_registro = {
-            "email": email, "nome": nome, "projeto": projeto,
-            "atividade": atividade, "status": acao,
+            "email": email, 
+            "nome": nome, 
+            "projeto": projeto,
+            "atividade": atividade, 
+            "status": acao,
             "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         }
+        
+        # 3. Une os dados
         df_atualizado = pd.concat([df_existente, pd.DataFrame([novo_registro])], ignore_index=True)
-        conn.update(worksheet="time_logs", data=df_atualizado)
+        
+        # 4. ENVIO (Update) - Agora com a URL explícita para evitar o 404
+        conn.update(spreadsheet=url_planilha, worksheet="time_logs", data=df_atualizado)
+        
         st.cache_data.clear()
         return True
     except Exception as e:
-        st.error(f"Erro ao salvar na planilha: {e}")
+        st.error(f"Erro técnico no salvamento: {e}")
         return False
 
 # =====================================================================
