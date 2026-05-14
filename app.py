@@ -115,33 +115,52 @@ def modal_confirmacao(email, nome, projeto, atividade, acao):
 # =====================================================================
 # 5. LOGICA PRINCIPAL
 # =====================================================================
+# =====================================================================
+# 5. LOGICA PRINCIPAL
+# =====================================================================
 def main():
     st.title("🚀 Central de Controle de Atividades")
 
-    # Login na Sidebar
+    # 1. CARREGAMENTO INICIAL DE DADOS (Importante vir antes do Login)
+    df_users = get_data("users")
+
+    # Sidebar - Login
     with st.sidebar:
         st.header("🔐 Acesso")
         email_input = st.text_input("Gmail cadastrado:").strip().lower()
-     st.sidebar.write(f"Debug: Você digitou '{email_input}'")
-if not df_users.empty:
-    st.sidebar.write("Emails na lista:", df_users['email'].tolist())
-     
+        
+        # DEBUG TÁTICO NA SIDEBAR
+        if email_input:
+            st.divider()
+            st.write(f"🔍 Buscando: `{email_input}`")
+            if not df_users.empty:
+                # Mostra os emails que o sistema realmente está lendo da planilha
+                lista_emails = [str(e).strip().lower() for e in df_users['email'].tolist()]
+                st.write("📋 Emails cadastrados na planilha:", lista_emails)
+                
+                if email_input in lista_emails:
+                    st.success("✅ Email encontrado na base!")
+                else:
+                    st.error("❌ Email NÃO está na lista.")
+            else:
+                st.warning("⚠️ A aba 'users' parece estar vazia para o sistema.")
 
+    # Bloqueio de Acesso
     if not email_input:
         st.info("Digite seu e-mail na barra lateral para acessar o painel.")
         return
 
-    # Validação de Usuário
-    df_users = get_data("users")
-    if df_users.empty or email_input not in df_users['email'].str.lower().values:
-        st.error("Usuário não autorizado ou aba 'users' não configurada.")
+    # Validação de Usuário Blindada
+    if df_users.empty or email_input not in [str(e).strip().lower() for e in df_users['email'].tolist()]:
+        st.error("Acesso Negado: Usuário não autorizado ou erro na leitura da base 'users'.")
         return
 
+    # Se passou, busca os dados do usuário
     user_row = df_users[df_users['email'].str.lower() == email_input].iloc[0]
     nome_usuario = user_row['nome']
     st.sidebar.success(f"Bem-vindo, {nome_usuario}")
 
-    # Tabs
+    # --- RESTANTE DO CÓDIGO (TABS) ---
     tab_track, tab_dash = st.tabs(["🕒 Execução", "📊 Dashboard"])
 
     with tab_track:
@@ -151,45 +170,33 @@ if not df_users.empty:
         else:
             projeto_sel = st.selectbox("Selecione o Projeto", df_tasks['projeto'].unique())
             atividades = df_tasks[df_tasks['projeto'] == projeto_sel]['atividade'].unique()
-
             st.divider()
 
-            # Histórico para verificar status atual
             df_logs = get_data("time_logs")
 
             for task in atividades:
                 with st.container():
                     col_info, col_btn = st.columns([3, 1])
                     
-                    # Logica para descobrir o último status desta tarefa para este usuário
                     user_task_logs = df_logs[(df_logs['email'] == email_input) & (df_logs['atividade'] == task)]
                     status_atual = user_task_logs.iloc[-1]['status'] if not user_task_logs.empty else "PENDENTE"
 
                     with col_info:
-                        st.markdown(f"""
-                            <div class="kpi-card">
-                                <strong>{task}</strong><br>
-                                <small>Último Status: {status_atual}</small>
-                            </div>
-                        """, unsafe_allow_html=True)
+                        st.markdown(f"""<div class="kpi-card"><strong>{task}</strong><br><small>Status: {status_atual}</small></div>""", unsafe_allow_html=True)
 
                     with col_btn:
-                        if status_atual == "INICIAR" or status_atual == "RETOMAR":
-                            # Se está rodando, permite Pausar ou Finalizar
+                        # Lógica de botões simplificada para resposta rápida
+                        if status_atual in ["INICIAR", "RETOMAR"]:
                             c1, c2 = st.columns(2)
-                            if c1.button("⏸️", key=f"pause_{task}"):
-                                modal_confirmacao(email_input, nome_usuario, projeto_sel, task, "PAUSAR")
-                            if c2.button("✅", key=f"fin_{task}"):
-                                modal_confirmacao(email_input, nome_usuario, projeto_sel, task, "FINALIZAR")
+                            if c1.button("⏸️", key=f"p_{task}"): modal_confirmacao(email_input, nome_usuario, projeto_sel, task, "PAUSAR")
+                            if c2.button("✅", key=f"f_{task}"): modal_confirmacao(email_input, nome_usuario, projeto_sel, task, "FINALIZAR")
                         else:
-                            # Se está parado/pausado/finalizado, permite Iniciar/Retomar
-                            btn_label = "🚀 INICIAR" if status_atual == "PENDENTE" else "▶️ RETOMAR"
-                            if st.button(btn_label, key=f"start_{task}"):
-                                modal_confirmacao(email_input, nome_usuario, projeto_sel, task, "INICIAR")
+                            label = "🚀 INICIAR" if status_atual == "PENDENTE" else "▶️ RETOMAR"
+                            if st.button(label, key=f"s_{task}"): modal_confirmacao(email_input, nome_usuario, projeto_sel, task, "INICIAR")
 
     with tab_dash:
-        st.subheader("Dashboard em desenvolvimento")
-        st.dataframe(df_logs[df_logs['projeto'] == projeto_sel] if not df_logs.empty else [])
-
-if __name__ == "__main__":
-    main()
+        st.subheader(f"Dashboard: {projeto_sel}")
+        if not df_logs.empty:
+            st.dataframe(df_logs[df_logs['projeto'] == projeto_sel], use_container_width=True)
+        else:
+            st.info("Aguardando primeiros registros de tempo.")
