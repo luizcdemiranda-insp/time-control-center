@@ -40,23 +40,26 @@ st.markdown("""
 # =====================================================================
 def inicializar_conexao():
     try:
-        # Tenta conectar usando os segredos do Streamlit Cloud
+        # Tenta ler os segredos brutos para ver se o TOML está certo
+        if "connections" not in st.secrets:
+            st.error("❌ Erro Crítico: A seção [connections.gsheets] não foi encontrada no Secrets.")
+            st.stop()
+            
         conn = st.connection("gsheets", type=GSheetsConnection)
+        
+        # Tenta uma operação básica de metadados
+        # Se falhar aqui, o problema é permissão no Google Cloud
+        spreadsheet_metadata = conn.read(nrows=1) 
+        
         return conn
     except Exception as e:
-        # Exibe o erro técnico real para diagnóstico sênior
-        st.error("🚨 Detalhes Técnicos do Erro:")
-        st.code(str(e)) 
+        st.error("🚨 FALHA NA PONTE GOOGLE-STREAMLIT")
+        st.warning("Verifique se o e-mail abaixo tem permissão de EDITOR na sua planilha:")
+        st.code(st.secrets["connections"]["gsheets"]["client_email"])
+        st.divider()
+        st.error("Detalhe técnico do erro:")
+        st.exception(e) # Isso vai mostrar o Traceback completo na tela
         st.stop()
-
-conn = inicializar_conexao()
-
-# Bloco de diagnóstico temporário
-try:
-    abas_disponiveis = conn.list_sheets()
-    st.sidebar.write("Abas encontradas:", abas_disponiveis)
-except Exception as e:
-    st.sidebar.error("Não foi possível listar as abas.")
 
 @st.cache_data(ttl=60)
 def get_data(worksheet_name):
