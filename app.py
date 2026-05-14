@@ -49,11 +49,16 @@ def inicializar_conexao():
 
 conn = inicializar_conexao()
 
-@st.cache_data(ttl=0) # Cache curto para testes
+@st.cache_data(ttl=0)
 def get_data(worksheet_name):
     try:
         df = conn.read(worksheet=worksheet_name, ttl=0)
-        return df.fillna("")
+        if df is not None and not df.empty:
+            # Blindagem Sênior: Limpa os nomes das colunas
+            # Remove espaços e coloca tudo em minúsculo
+            df.columns = [str(c).strip().lower() for c in df.columns]
+            return df.fillna("")
+        return pd.DataFrame()
     except Exception as e:
         return pd.DataFrame()
 
