@@ -49,7 +49,7 @@ def inicializar_conexao():
 
 conn = inicializar_conexao()
 
-@st.cache_data(ttl=10) # Cache curto para testes
+@st.cache_data(ttl=0) # Cache curto para testes
 def get_data(worksheet_name):
     try:
         df = conn.read(worksheet=worksheet_name, ttl=0)
