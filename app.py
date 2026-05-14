@@ -109,6 +109,10 @@ def main():
     if not email_input:
         st.info("Aguardando login na barra lateral...")
         return
+        
+st.write("--- DEBUG DE ACESSO ---")
+st.write(f"Você digitou: '{email_input}'")
+st.write(f"Emails lidos da planilha: {df_users['email'].tolist()}")
 
     if df_users.empty or email_input not in [str(e).strip().lower() for e in df_users['email'].tolist()]:
         st.error("Acesso negado.")
