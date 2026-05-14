@@ -49,6 +49,13 @@ def inicializar_conexao():
 
 conn = inicializar_conexao()
 
+# Bloco de diagnóstico temporário
+try:
+    abas_disponiveis = conn.list_sheets()
+    st.sidebar.write("Abas encontradas:", abas_disponiveis)
+except Exception as e:
+    st.sidebar.error("Não foi possível listar as abas.")
+
 @st.cache_data(ttl=60)
 def get_data(worksheet_name):
     try:
