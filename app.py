@@ -10,7 +10,7 @@ import time
 try:
     from streamlit_gsheets import GSheetsConnection
 except ImportError:
-    st.error("Biblioteca 'st-gsheets-connection' não encontrada.")
+    st.error("Biblioteca 'st-gsheets-connection' não encontrada. Instale via pip.")
     st.stop()
 
 # Configuração da página (DEVE SER O PRIMEIRO COMANDO ST)
@@ -36,26 +36,24 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # =====================================================================
-# 3. CONEXÃO E FUNÇÕES DE DADOS (BLINDAGEM)
+# 3. CONEXÃO E FUNÇÕES DE DADOS (BLINDAGEM SÊNIOR)
 # =====================================================================
 def inicializar_conexao():
     try:
-        conn = st.connection("gsheets", type=GSheetsConnection)
-        return conn
+        return st.connection("gsheets", type=GSheetsConnection)
     except Exception as e:
-        st.error("🚨 FALHA NA CONEXÃO")
+        st.error("🚨 FALHA NA CONEXÃO COM O GOOGLE SHEETS")
         st.exception(e)
         st.stop()
 
 conn = inicializar_conexao()
 
-@st.cache_data(ttl=0)
+@st.cache_data(ttl=0) # Cache zerado para refletir a planilha instantaneamente
 def get_data(worksheet_name):
     try:
         df = conn.read(worksheet=worksheet_name, ttl=0)
         if df is not None and not df.empty:
-            # Blindagem Sênior: Limpa os nomes das colunas
-            # Remove espaços e coloca tudo em minúsculo
+            # BLINDAGEM: Limpa espaços e coloca todos os cabeçalhos em minúsculo
             df.columns = [str(c).strip().lower() for c in df.columns]
             return df.fillna("")
         return pd.DataFrame()
@@ -64,7 +62,7 @@ def get_data(worksheet_name):
 
 def registrar_log(email, nome, projeto, atividade, acao):
     try:
-        df_existente = conn.read(worksheet="time_logs")
+        df_existente = get_data("time_logs") # Usa a função blindada
         novo_registro = {
             "email": email, "nome": nome, "projeto": projeto,
             "atividade": atividade, "status": acao,
@@ -75,7 +73,7 @@ def registrar_log(email, nome, projeto, atividade, acao):
         st.cache_data.clear()
         return True
     except Exception as e:
-        st.error(f"Erro ao salvar: {e}")
+        st.error(f"Erro ao salvar na planilha: {e}")
         return False
 
 # =====================================================================
@@ -97,56 +95,79 @@ def modal_confirmacao(email, nome, projeto, atividade, acao):
 def main():
     st.title("🚀 Central de Controle de Atividades")
 
-    # Carregamento de usuários
+    # Carregamento da aba de usuários
     df_users = get_data("users")
 
     with st.sidebar:
         st.header("🔐 Acesso")
         email_input = st.text_input("Gmail cadastrado:").strip().lower()
-        
-        if email_input and not df_users.empty:
+
+        # ==================== RAIO-X ====================
+        st.divider()
+        st.write("🛠️ **RAIO-X DA PLANILHA**")
+        if not df_users.empty:
+            st.write("Colunas Detectadas:", df_users.columns.tolist())
+            st.dataframe(df_users.head(3)) # Mostra como o Python está lendo as células
+        else:
+            st.warning("A aba 'users' está vazia ou não foi encontrada.")
+        st.divider()
+        # ================================================
+
+        # Trava 1: Se a coluna email não existir, interrompe sem crash
+        if "email" not in df_users.columns:
+            st.error("🚨 ERRO: O sistema não encontrou a coluna 'email'. Verifique o RAIO-X acima para ver o que ele está lendo.")
+            return
+
+        # Trava 2: Validação de e-mail segura
+        if email_input:
             lista_emails = [str(e).strip().lower() for e in df_users['email'].tolist()]
             if email_input in lista_emails:
-                st.success("✅ Usuário Identificado")
+                st.success("✅ Acesso Liberado")
             else:
-                st.error("❌ Usuário não cadastrado")
+                st.error("❌ E-mail não localizado na base de dados.")
 
-    if not email_input:
-        st.info("Aguardando login na barra lateral...")
-        return
-        
-    st.write("--- DEBUG DE ACESSO ---")
-    st.write(f"Você digitou: '{email_input}'")
-    st.write(f"Emails lidos da planilha: {df_users['email'].tolist()}")
-
-    if df_users.empty or email_input not in [str(e).strip().lower() for e in df_users['email'].tolist()]:
-        st.error("Acesso negado.")
+    # Protege a tela principal até o usuário passar no login
+    if not email_input or "email" not in df_users.columns or email_input not in lista_emails:
+        st.info("Aguardando login válido na barra lateral...")
         return
 
-    user_row = df_users[df_users['email'].str.lower() == email_input].iloc[0]
-    nome_usuario = user_row['nome']
+    # Se chegou aqui, o usuário está logado. Resgata o nome.
+    user_row = df_users[df_users['email'] == email_input].iloc[0]
+    nome_usuario = user_row.get('nome', 'Usuário')
 
+    # Navegação do App
     tab_track, tab_dash = st.tabs(["🕒 Execução", "📊 Dashboard"])
 
     with tab_track:
         df_tasks = get_data("projects_tasks")
-        if df_tasks.empty:
-            st.warning("Cadastre projetos e tarefas na planilha.")
+        
+        # Validação da aba de tarefas
+        if df_tasks.empty or "projeto" not in df_tasks.columns or "atividade" not in df_tasks.columns:
+            st.warning("⚠️ A aba 'projects_tasks' precisa ter as colunas 'projeto' e 'atividade' preenchidas.")
         else:
-            projeto_sel = st.selectbox("Selecione o Projeto", df_tasks['projeto'].unique())
+            projeto_sel = st.selectbox("Selecione o Projeto Ativo", df_tasks['projeto'].unique())
             atividades = df_tasks[df_tasks['projeto'] == projeto_sel]['atividade'].unique()
+            
+            st.divider()
             df_logs = get_data("time_logs")
 
+            # Renderiza as atividades
             for task in atividades:
                 with st.container():
                     col_info, col_btn = st.columns([3, 1])
-                    user_task_logs = df_logs[(df_logs['email'] == email_input) & (df_logs['atividade'] == task)]
-                    status_atual = user_task_logs.iloc[-1]['status'] if not user_task_logs.empty else "PENDENTE"
+                    
+                    status_atual = "PENDENTE"
+                    # Blindagem ao ler o histórico de logs
+                    if not df_logs.empty and "email" in df_logs.columns and "atividade" in df_logs.columns:
+                        user_task_logs = df_logs[(df_logs['email'] == email_input) & (df_logs['atividade'] == task)]
+                        if not user_task_logs.empty:
+                            status_atual = user_task_logs.iloc[-1].get('status', 'PENDENTE')
 
                     with col_info:
                         st.markdown(f'<div class="kpi-card"><strong>{task}</strong><br><small>Status: {status_atual}</small></div>', unsafe_allow_html=True)
                     
                     with col_btn:
+                        # Dinâmica de Botões
                         if status_atual in ["INICIAR", "RETOMAR"]:
                             c1, c2 = st.columns(2)
                             if c1.button("⏸️", key=f"p_{task}"): modal_confirmacao(email_input, nome_usuario, projeto_sel, task, "PAUSAR")
@@ -156,7 +177,12 @@ def main():
                             if st.button(label, key=f"s_{task}"): modal_confirmacao(email_input, nome_usuario, projeto_sel, task, "INICIAR")
 
     with tab_dash:
-        st.dataframe(df_logs)
+        st.subheader(f"Visão Geral: {projeto_sel}")
+        if not df_logs.empty and "projeto" in df_logs.columns:
+            df_projeto = df_logs[df_logs['projeto'] == projeto_sel]
+            st.dataframe(df_projeto, use_container_width=True)
+        else:
+            st.info("Nenhum log registrado para este projeto ainda.")
 
 if __name__ == "__main__":
     main()
