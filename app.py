@@ -166,4 +166,35 @@ def main():
                         if status_atual in ["INICIAR", "RETOMAR"]:
                             c1, c2 = st.columns(2)
                             if c1.button("⏸️", key=f"p_{task}"): modal_confirmacao(email_input, nome_usuario, projeto_sel, task, "PAUSAR")
-                            if c2.button("✅", key=f"f_{task}"): modal_confirmacao(email_input, nome_usuario, projeto_sel, task, "FINALIZ
+                            if c2.button("✅", key=f"f_{task}"): modal_confirmacao(email_input, nome_usuario, projeto_sel, task, "FINALIZAR")
+                        else:
+                            label = "🚀 INICIAR" if status_atual == "PENDENTE" else "▶️ RETOMAR"
+                            if st.button(label, key=f"s_{task}"): modal_confirmacao(email_input, nome_usuario, projeto_sel, task, "INICIAR")
+
+            # --- RENDERIZAÇÃO: TAREFAS CONCLUÍDAS ---
+            if tarefas_concluidas:
+                st.write("") # Espaçamento
+                st.subheader("✅ Tarefas Concluídas")
+                
+                for task, status_atual in tarefas_concluidas:
+                    with st.container():
+                        col_info, col_btn = st.columns([3, 1])
+                        
+                        with col_info:
+                            # Borda Verde para finalizadas
+                            st.markdown(f'<div class="kpi-card" style="border-left-color: #2ECC71;"><strong>{task}</strong><br><small>Status: CONCLUÍDO</small></div>', unsafe_allow_html=True)
+                        
+                        with col_btn:
+                            if st.button("🔄 REABRIR", key=f"re_{task}"): 
+                                modal_confirmacao(email_input, nome_usuario, projeto_sel, task, "RETOMAR")
+
+    with tab_dash:
+        st.subheader(f"Visão Geral: {projeto_sel}")
+        if not df_logs.empty and "projeto" in df_logs.columns:
+            df_projeto = df_logs[df_logs['projeto'] == projeto_sel]
+            st.dataframe(df_projeto, use_container_width=True)
+        else:
+            st.info("Nenhum log registrado para este projeto ainda.")
+
+if __name__ == "__main__":
+    main()
