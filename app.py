@@ -6,18 +6,16 @@ import pandas as pd
 from datetime import datetime
 import time
 
-# Tenta importar a conexão
 try:
     from streamlit_gsheets import GSheetsConnection
 except ImportError:
     st.error("Biblioteca 'st-gsheets-connection' não encontrada. Instale via pip.")
     st.stop()
 
-# Configuração da página (DEVE SER O PRIMEIRO COMANDO ST)
 st.set_page_config(page_title="Mercúrio - Time Tracker", layout="wide", initial_sidebar_state="expanded")
 
 # =====================================================================
-# 2. ESTILO VISUAL (PADRÃO MERCÚRIO)
+# 2. ESTILO VISUAL (PADRÃO MERCÚRIO DINÂMICO)
 # =====================================================================
 st.markdown("""
     <style>
@@ -28,7 +26,7 @@ st.markdown("""
         background-color: #161B22;
         padding: 15px;
         border-radius: 10px;
-        border-left: 5px solid #FF4B4B;
+        border-left: 5px solid; /* A cor será definida no HTML inline */
         margin-bottom: 10px;
         color: white;
     }
@@ -36,7 +34,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # =====================================================================
-# 3. CONEXÃO E FUNÇÕES DE DADOS (BLINDAGEM SÊNIOR)
+# 3. CONEXÃO E FUNÇÕES DE DADOS
 # =====================================================================
 def inicializar_conexao():
     try:
@@ -51,46 +49,25 @@ conn = inicializar_conexao()
 @st.cache_data(ttl=0)
 def get_data(worksheet_name):
     try:
-        # Forçamos a URL da planilha ignorando temporariamente o Secrets
-        url_planilha = "https://docs.google.com/spreadsheets/d/1mdsfbMh6rPUArPycuWqxm7vruUx5JRptP3Z0ufXelA0/edit"
-        
-        # Lemos diretamente passando a URL explícita
-        df = conn.read(spreadsheet=url_planilha, worksheet=worksheet_name, ttl=0)
-        
+        df = conn.read(worksheet=worksheet_name, ttl=0)
         if df is not None and not df.empty:
             df.columns = [str(c).strip().lower() for c in df.columns]
             return df.fillna("")
         return pd.DataFrame()
-        
     except Exception as e:
-        # DESLIGAMOS A BLINDAGEM: Se der erro, ele vai gritar na tela
-        st.sidebar.error(f"🚨 ERRO TÉCNICO AO LER A ABA '{worksheet_name}':")
-        st.sidebar.code(str(e)) # Mostra o erro raiz
         return pd.DataFrame()
 
 def registrar_log(email, nome, projeto, atividade, acao):
     try:
         url_planilha = "https://docs.google.com/spreadsheets/d/1mdsfbMh6rPUArPycuWqxm7vruUx5JRptP3Z0ufXelA0/edit"
-        
-        # 1. Busca os dados existentes usando a URL
         df_existente = get_data("time_logs")
-        
-        # 2. Cria o novo registro
         novo_registro = {
-            "email": email, 
-            "nome": nome, 
-            "projeto": projeto,
-            "atividade": atividade, 
-            "status": acao,
+            "email": email, "nome": nome, "projeto": projeto,
+            "atividade": atividade, "status": acao,
             "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         }
-        
-        # 3. Une os dados
         df_atualizado = pd.concat([df_existente, pd.DataFrame([novo_registro])], ignore_index=True)
-        
-        # 4. ENVIO (Update) - Agora com a URL explícita para evitar o 404
         conn.update(spreadsheet=url_planilha, worksheet="time_logs", data=df_atualizado)
-        
         st.cache_data.clear()
         return True
     except Exception as e:
@@ -116,94 +93,77 @@ def modal_confirmacao(email, nome, projeto, atividade, acao):
 def main():
     st.title("🚀 Central de Controle de Atividades")
 
-    # Carregamento da aba de usuários
     df_users = get_data("users")
 
     with st.sidebar:
         st.header("🔐 Acesso")
         email_input = st.text_input("Gmail cadastrado:").strip().lower()
 
-        # ==================== RAIO-X ====================
-        st.divider()
-        st.write("🛠️ **RAIO-X DA PLANILHA**")
-        if not df_users.empty:
-            st.write("Colunas Detectadas:", df_users.columns.tolist())
-            st.dataframe(df_users.head(3)) # Mostra como o Python está lendo as células
-        else:
-            st.warning("A aba 'users' está vazia ou não foi encontrada.")
-        st.divider()
-        # ================================================
-
-        # Trava 1: Se a coluna email não existir, interrompe sem crash
+        # O RAIO-X foi removido para produção
         if "email" not in df_users.columns:
-            st.error("🚨 ERRO: O sistema não encontrou a coluna 'email'. Verifique o RAIO-X acima para ver o que ele está lendo.")
+            st.error("🚨 ERRO de Infraestrutura: Coluna 'email' não encontrada na base.")
             return
 
-        # Trava 2: Validação de e-mail segura
         if email_input:
             lista_emails = [str(e).strip().lower() for e in df_users['email'].tolist()]
             if email_input in lista_emails:
                 st.success("✅ Acesso Liberado")
             else:
-                st.error("❌ E-mail não localizado na base de dados.")
+                st.error("❌ E-mail não localizado.")
 
-    # Protege a tela principal até o usuário passar no login
     if not email_input or "email" not in df_users.columns or email_input not in lista_emails:
         st.info("Aguardando login válido na barra lateral...")
         return
 
-    # Se chegou aqui, o usuário está logado. Resgata o nome.
     user_row = df_users[df_users['email'] == email_input].iloc[0]
     nome_usuario = user_row.get('nome', 'Usuário')
 
-    # Navegação do App
     tab_track, tab_dash = st.tabs(["🕒 Execução", "📊 Dashboard"])
 
     with tab_track:
         df_tasks = get_data("projects_tasks")
         
-        # Validação da aba de tarefas
         if df_tasks.empty or "projeto" not in df_tasks.columns or "atividade" not in df_tasks.columns:
-            st.warning("⚠️ A aba 'projects_tasks' precisa ter as colunas 'projeto' e 'atividade' preenchidas.")
+            st.warning("⚠️ Cadastre projetos e atividades.")
         else:
             projeto_sel = st.selectbox("Selecione o Projeto Ativo", df_tasks['projeto'].unique())
             atividades = df_tasks[df_tasks['projeto'] == projeto_sel]['atividade'].unique()
-            
             st.divider()
+            
             df_logs = get_data("time_logs")
 
-            # Renderiza as atividades
+            # --- MOTOR DE SEGREGAÇÃO DE TAREFAS ---
+            tarefas_ativas = []
+            tarefas_concluidas = []
+
             for task in atividades:
+                status_atual = "PENDENTE"
+                if not df_logs.empty and "email" in df_logs.columns and "atividade" in df_logs.columns:
+                    user_task_logs = df_logs[(df_logs['email'] == email_input) & (df_logs['atividade'] == task)]
+                    if not user_task_logs.empty:
+                        status_atual = user_task_logs.iloc[-1].get('status', 'PENDENTE')
+                
+                # Separa as listas
+                if status_atual == "FINALIZAR":
+                    tarefas_concluidas.append((task, status_atual))
+                else:
+                    tarefas_ativas.append((task, status_atual))
+
+            # --- RENDERIZAÇÃO: TAREFAS ATIVAS ---
+            st.subheader("⚙️ Em Andamento / Pendentes")
+            if not tarefas_ativas:
+                st.info("Todas as tarefas deste projeto foram concluídas!")
+
+            for task, status_atual in tarefas_ativas:
                 with st.container():
                     col_info, col_btn = st.columns([3, 1])
                     
-                    status_atual = "PENDENTE"
-                    # Blindagem ao ler o histórico de logs
-                    if not df_logs.empty and "email" in df_logs.columns and "atividade" in df_logs.columns:
-                        user_task_logs = df_logs[(df_logs['email'] == email_input) & (df_logs['atividade'] == task)]
-                        if not user_task_logs.empty:
-                            status_atual = user_task_logs.iloc[-1].get('status', 'PENDENTE')
-
                     with col_info:
-                        st.markdown(f'<div class="kpi-card"><strong>{task}</strong><br><small>Status: {status_atual}</small></div>', unsafe_allow_html=True)
+                        # Borda Vermelha para ativas
+                        st.markdown(f'<div class="kpi-card" style="border-left-color: #FF4B4B;"><strong>{task}</strong><br><small>Status: {status_atual}</small></div>', unsafe_allow_html=True)
                     
                     with col_btn:
-                        # Dinâmica de Botões
                         if status_atual in ["INICIAR", "RETOMAR"]:
                             c1, c2 = st.columns(2)
                             if c1.button("⏸️", key=f"p_{task}"): modal_confirmacao(email_input, nome_usuario, projeto_sel, task, "PAUSAR")
-                            if c2.button("✅", key=f"f_{task}"): modal_confirmacao(email_input, nome_usuario, projeto_sel, task, "FINALIZAR")
-                        else:
-                            label = "🚀 INICIAR" if status_atual == "PENDENTE" else "▶️ RETOMAR"
-                            if st.button(label, key=f"s_{task}"): modal_confirmacao(email_input, nome_usuario, projeto_sel, task, "INICIAR")
-
-    with tab_dash:
-        st.subheader(f"Visão Geral: {projeto_sel}")
-        if not df_logs.empty and "projeto" in df_logs.columns:
-            df_projeto = df_logs[df_logs['projeto'] == projeto_sel]
-            st.dataframe(df_projeto, use_container_width=True)
-        else:
-            st.info("Nenhum log registrado para este projeto ainda.")
-
-if __name__ == "__main__":
-    main()
+                            if c2.button("✅", key=f"f_{task}"): modal_confirmacao(email_input, nome_usuario, projeto_sel, task, "FINALIZ
