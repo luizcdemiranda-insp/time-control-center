@@ -64,11 +64,18 @@ def inicializar_conexao():
 @st.cache_data(ttl=60)
 def get_data(worksheet_name):
     try:
-        # Blindagem contra planilhas vazias ou inexistentes
-        df = conn.read(worksheet=worksheet_name)
+        # ttl=0 força o Streamlit a buscar os dados no Google agora, sem usar memória antiga
+        df = conn.read(worksheet=worksheet_name, ttl=0)
+        
+        # Mostra na lateral o que foi lido para debug
+        with st.sidebar.expander(f"Debug: {worksheet_name}"):
+            st.write(f"Linhas: {len(df)}")
+            st.write("Colunas detectadas:", df.columns.tolist())
+            st.dataframe(df.head(2))
+            
         return df.fillna("")
     except Exception as e:
-        st.sidebar.warning(f"Aba '{worksheet_name}' não encontrada ou vazia.")
+        st.sidebar.error(f"Erro ao ler aba {worksheet_name}")
         return pd.DataFrame()
 
 def registrar_log(email, nome, projeto, atividade, acao):
