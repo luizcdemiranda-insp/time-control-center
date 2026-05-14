@@ -40,11 +40,13 @@ st.markdown("""
 # =====================================================================
 def inicializar_conexao():
     try:
+        # Tenta conectar usando os segredos do Streamlit Cloud
         conn = st.connection("gsheets", type=GSheetsConnection)
         return conn
     except Exception as e:
-        st.error("❌ Erro na configuração do Secrets.")
-        st.info("Certifique-se de que o arquivo .streamlit/secrets.toml existe e está formatado corretamente.")
+        # Exibe o erro técnico real para diagnóstico sênior
+        st.error("🚨 Detalhes Técnicos do Erro:")
+        st.code(str(e)) 
         st.stop()
 
 conn = inicializar_conexao()
