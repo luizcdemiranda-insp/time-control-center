@@ -48,16 +48,24 @@ def inicializar_conexao():
 
 conn = inicializar_conexao()
 
-@st.cache_data(ttl=0) # Cache zerado para refletir a planilha instantaneamente
+@st.cache_data(ttl=0)
 def get_data(worksheet_name):
     try:
-        df = conn.read(worksheet=worksheet_name, ttl=0)
+        # Forçamos a URL da planilha ignorando temporariamente o Secrets
+        url_planilha = "https://docs.google.com/spreadsheets/d/1mdsfbMh6rPUArPycuWqxm7vruUx5JRptP3Z0ufXelA0/edit"
+        
+        # Lemos diretamente passando a URL explícita
+        df = conn.read(spreadsheet=url_planilha, worksheet=worksheet_name, ttl=0)
+        
         if df is not None and not df.empty:
-            # BLINDAGEM: Limpa espaços e coloca todos os cabeçalhos em minúsculo
             df.columns = [str(c).strip().lower() for c in df.columns]
             return df.fillna("")
         return pd.DataFrame()
+        
     except Exception as e:
+        # DESLIGAMOS A BLINDAGEM: Se der erro, ele vai gritar na tela
+        st.sidebar.error(f"🚨 ERRO TÉCNICO AO LER A ABA '{worksheet_name}':")
+        st.sidebar.code(str(e)) # Mostra o erro raiz
         return pd.DataFrame()
 
 def registrar_log(email, nome, projeto, atividade, acao):
