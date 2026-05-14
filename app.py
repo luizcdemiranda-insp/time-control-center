@@ -5,7 +5,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import time
-
+ 
 # Tenta importar a conexão, se falhar avisa o usuário
 try:
     from streamlit_gsheets import GSheetsConnection
