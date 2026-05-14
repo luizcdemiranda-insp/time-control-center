@@ -1,3 +1,11 @@
+try:
+    test_df = conn.read(worksheet="users", ttl=0)
+    st.sidebar.success("✅ Conexão com Sheets: OK")
+except Exception as e:
+    st.sidebar.error("❌ Falha no Secrets/Planilha")
+    st.sidebar.caption(str(e))
+
+
 # =====================================================================
 # 1. CONFIGURAÇÕES, IMPORTAÇÕES E CSS
 # =====================================================================
