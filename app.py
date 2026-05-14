@@ -125,6 +125,7 @@ def main():
      st.sidebar.write(f"Debug: Você digitou '{email_input}'")
 if not df_users.empty:
     st.sidebar.write("Emails na lista:", df_users['email'].tolist())
+     
 
     if not email_input:
         st.info("Digite seu e-mail na barra lateral para acessar o painel.")
